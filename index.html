@@ -28,7 +28,7 @@
 <body>
   <h2>Získaj svoje výskumné ID</h2>
   <form id="idForm">
-    <input type="email" id="email" placeholder="Zadaj svoj e-mail" required>
+    <input type="email" id="email" placeholder="Zadaj svoj e-mail" required />
     <button type="submit">Získať ID</button>
   </form>
   <div id="result"></div>
@@ -37,52 +37,59 @@
     // Inicializácia EmailJS s tvojím Public Key
     emailjs.init("vn3f9l_KZwCYDZpKQ");
 
-    // Použi tu svoj nový Google Apps Script URL
-    const scriptBaseURL = "https://script.google.com/macros/s/AKfycbzUOhHPCVYF2D4F1vjO-xn_tdY0J2ErWErJZgG7q7TcXAewIvCVs6i9ZXImG51SecQg/exec"; 
+    // Nový Google Apps Script URL – skontroluj, či je redeploynutý a aktuálny
+    const scriptBaseURL = "https://script.google.com/macros/s/AKfycbzUOhHPCVYF2D4F1vjO-xn_tdY0J2ErWErJZgG7q7TcXAewIvCVs6i9ZXImG51SecQg/exec";
+    
     const form = document.getElementById("idForm");
     const result = document.getElementById("result");
 
-    form.addEventListener("submit", (e) => {
+    form.addEventListener("submit", function(e) {
       e.preventDefault();
       const email = document.getElementById("email").value;
       result.textContent = "Generujem a odosielam ID...";
 
-      // Vytvoríme <script> tag pre JSONP
+      // Vytvoríme unikátny callback name, aby nedošlo k cacheovaniu
+      const callbackName = "onIDResponse_" + Math.floor(Math.random() * 1000000);
+
+      // Vytvoríme <script> tag pre JSONP požiadavku
       const script = document.createElement("script");
-      const callbackName = "onIDResponse";
-      // Pridáme aj parameter na zabránienie cache
       const randomParam = Math.floor(Math.random() * 999999);
-      // Nastav URL s callback a cache parametrom
       script.src = scriptBaseURL + "?callback=" + callbackName + "&r=" + randomParam;
-      
-      // Definujeme callback funkciu, ktorá bude zavolaná z Apps Scriptu
+
+      // Definujeme callback funkciu, ktorá bude volaná zo skriptu
       window[callbackName] = async function(data) {
+        console.log("Dáta z JSONP:", data);
+        if (!data || !data.id) {
+          result.textContent = "Server nevrátil ID.";
+          cleanup();
+          return;
+        }
         const uniqueID = data.id;
         try {
-          // Odoslanie e-mailu cez EmailJS – používame premenné podľa tvojej šablóny
+          // Odoslanie e-mailu cez EmailJS (premenné musia zodpovedať tvojej šablóne – použitie {{email}} a {{message}})
           const templateParams = {
             email: email,
             message: `Vaše výskumné ID je: ${uniqueID}`
           };
-          
           await emailjs.send("service_x1q42bf", "template_22uiss7", templateParams);
-          
           result.textContent = `ID ${uniqueID} bolo odoslané na ${email}.`;
+          form.reset();
         } catch (err) {
           console.error("EmailJS chyba:", err);
           result.textContent = "Nepodarilo sa odoslať e-mail.";
         }
-        // Odstránime skript a callback po vykonaní
-        document.body.removeChild(script);
-        delete window[callbackName];
+        cleanup();
       };
 
-      // Ak nastane chyba pri načítaní skriptu
       script.onerror = function() {
         result.textContent = "Nepodarilo sa získať ID (chyba scripta).";
+        cleanup();
+      };
+
+      function cleanup() {
         document.body.removeChild(script);
         delete window[callbackName];
-      };
+      }
 
       document.body.appendChild(script);
     });
